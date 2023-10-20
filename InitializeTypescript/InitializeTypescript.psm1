@@ -1,5 +1,43 @@
 #requires -Version 7
 
+function New-NPMScript {
+    param(
+        [string] $ScriptName,
+        [string] $ScriptCommand,
+        [string] $PackageJsonPath
+    )
+
+    # Read the existing package.json file
+    $packageJson = Get-Content $PackageJsonPath | ConvertFrom-Json
+    Add-Member -InputObject $packageJson.scripts -MemberType NoteProperty -Name $ScriptName -Value $ScriptCommand;
+    $packageJson | ConvertTo-Json | Set-Content $PackageJsonPath
+
+    Write-Host "[x] Added script $ScriptName to package.json" -ForegroundColor Green
+}
+
+function Start-VisualStudioCode {
+    param(
+        [string] $Folder
+    )
+
+    Write-Host "[x] Opening project in Visual Studio Code." -ForegroundColor Green
+
+    # Check if the user has insiders installed
+    $codeInsiders = Get-Command -Name code-insiders -ErrorAction SilentlyContinue
+
+    if ($null -eq $codeInsiders) {
+        Write-Host "[x] Visual Studio Code Insiders is not installed, falling back to Visual Studio Code." -ForegroundColor Yellow
+        $codeInsiders = Get-Command -Name code -ErrorAction SilentlyContinue
+    }
+
+    if ($null -eq $codeInsiders) {
+        Write-Host "[x] Visual Studio Code is not installed, please install it and try again." -ForegroundColor Red
+        throw "Visual Studio Code is not installed, please install it and try again."
+    }
+
+    & $codeInsiders $Folder
+
+}
 function Initialize-Typescript {
     [CmdletBinding()]
     param (
@@ -23,8 +61,6 @@ function Initialize-Typescript {
         Write-Host "[x] Initializing pnpm project." -ForegroundColor Green
         pnpm init | Out-Null
 
-        
-
         Write-Host "[x] Installing typescript packages." -ForegroundColor Green
         pnpm add @types/node ts-node typescript -D  | Out-Null
 
@@ -38,8 +74,9 @@ function Initialize-Typescript {
         Write-Host "[x] Creating index.ts" -ForegroundColor Green
         New-Item -Name src/index.ts -ItemType File -Force | Out-Null
 
-        Write-Host "[x] Opening project VSCode." -ForegroundColor Green
-        code $CURRENT_DIR
+        New-NPMScript -ScriptName "start" -ScriptCommand "ts-node src/index.ts" -PackageJsonPath "package.json"
+
+        Start-VisualStudioCode -Folder $CURRENT_DIR
     }
 }
 
